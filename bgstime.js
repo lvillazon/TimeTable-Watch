@@ -39,20 +39,20 @@ function showDateBar(theDay) {
 
 // show the hours, minutes and seconds until the next timetabled event
 function showCountdown(currentTime, endTime) {
-    console.log("current = " + currentTime + ", end= " + endTime);
+    //console.log("current = " + currentTime + ", end= " + endTime);
     g.setFontAlign(0,0);  // centre
     g.setFont("Vector", 50);
     g.setColor("#FFFF00");
     // draw the current counter value
     seconds1 = currentTimeInSeconds(currentTime);
     seconds2 = secondsSinceMidnight(endTime);
-    console.log("from " + currentTime.getHours()+ ":" + currentTime.getMinutes() + " to " + endTime + " is "+ (seconds1 - seconds2)/60);
+    //console.log("from " + currentTime.getHours()+ ":" + currentTime.getMinutes() + " to " + endTime + " is "+ (seconds1 - seconds2)/60);
     let timeLeft = seconds2-seconds1;
     let mins = Math.floor(timeLeft / 60).toString();
     if (mins<10) {
         mins = "0" + mins;  //padding with leading zero
     }
-    let secs = (countdown % 60).toString();
+    let secs = (timeLeft % 60).toString();
     if (secs<10) {
         secs = "0" + secs;  // padding with leading zero
     }
@@ -170,6 +170,7 @@ function getPeriod(time) {
         }
         
         // DEBUG CODE TO CHECK THE CURRENT PERIOD
+                                            /*
         if (p == undefined) {
             console.log("outside timetable");
         } else {
@@ -181,7 +182,7 @@ function getPeriod(time) {
 
             console.log("time left is:" + (timeLeft/60).toString());
         }
-        
+        */
     }
     return period;
 }
@@ -303,6 +304,20 @@ weekA: {
         {period:"789 end",    start:"15:00"},
         {period:"all end",    start:"15:10"},
         ],
+    sun: [
+        {period:"teg",        start:"8:30"},
+        {period:"t1 8w1",     start:"8:35"},
+        {period:"t2 free",    start:"9:25"},
+        {period:"treak",      start:"10:15"},
+        {period:"T/M",        start:"10:35"},
+        {period:"t3 12B",     start:"10:55"},
+        {period:"t4 9G",      start:"11:45"},
+        {period:"t5 free",    start:"12:35"},
+        {period:"t6 free",    start:"13:25"},
+        {period:"t7 7xy1",    start:"14:15"},
+        {period:"t89 end",    start:"15:00"},
+        {period:"tll end",    start:"15:10"},
+        ],
         },
 weekB: {
     tue: [
@@ -350,16 +365,19 @@ weekB: {
         },
 };
 
+require("Storage").writeJSON("timetable.json", timetable);
+
+*/
+/*
 var termDates = {
 TODO - think of a neat way to represent the entire school year
 need to specify:
 week A/B
 is it a school day
 bank holidays & inset
-
-
-require("Storage").writeJSON("timetable.json", timetable);
 */
+
+
 var timetable = loadTimeTable();
 //console.log(timetable);
 
