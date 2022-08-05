@@ -1,4 +1,25 @@
-function timeRemaining() {
+
+function dayView() {
+    let topMargin = 40;
+    let leftMargin = 20;
+    let fontSize = 20;
+    let lines = 7;
+    g.clear()
+    earliest = new Date();
+    showDateBar(new Date());
+    g.setFontAlign(-1,0);  // centre
+    g.setColor(255,255,255); //white
+    g.setFont("Vector", fontSize);
+    let periods = getTodaysPeriods(earliest);
+    for (let i=0; i<lines; i++) {
+        let p = i + vScroll; 
+        if (periods[p] != undefined) {
+            g.drawString(periods[p].period, leftMargin, i*fontSize+topMargin);
+        }
+    }
+}
+
+function countDownView() {
     g.clear();
     d = new Date();
     //d = new Date(2022, 5, 21, real_d.getHours()-5, real_d.getMinutes());  // DEBUG force the date/time to Thurs 23rd Jun at 11:00
@@ -6,18 +27,38 @@ function timeRemaining() {
     showDateBar(d);
     currentPeriod = getPeriod(d);
     nextPeriod = undefined;
-    //console.log(currentPeriod);
     if (currentPeriod != undefined) {
-        fitToLine(currentPeriod.period, "#FF4400", 45);
+        if (currentPeriod.period != START_MARKER &&
+            currentPeriod.period != END_MARKER) {
+            fitToLine(currentPeriod.period, "#FF4400", 45);
+        }
     
         nextPeriod = currentPeriod.next;
-        if (nextPeriod != undefined) {
+        if (nextPeriod != undefined &&
+            nextPeriod.period != START_MARKER &&
+            nextPeriod.period != END_MARKER) {
             fitToLine(nextPeriod.period, "#FF0000", 155);
         }
     }
-    if (nextPeriod != undefined) {
-        showCountdown(d, currentPeriod.end);
+    // show countdown if we are a specified period
+    // otherwise show the actual time
+    // NOTE the current period will show as the first period of the day,
+    // even if the time is too early. This is because the currentPeriod
+    // cannot be left undefined, so it is set to 1st period by default
+    // so to check whether to show the countdown, we must compare the
+    // current and start times
+//    console.log("current  :" + currentPeriod.period);
+//    console.log("next     :" + nextPeriod.period);
+//    console.log("til start:" + timeRemaining(d, currentPeriod.start));
+//    console.log("til   end:" + timeRemaining(d, currentPeriod.end));
+    //console.log("clause1:" + (currentPeriod.period !== END_PERIOD.period));
+    //console.log("clause2:" + (currentPeriod != START_PERIOD || timeRemaining(d, currentPeriod.end) < 5*60));
+    
+    if (timeRemaining(d, currentPeriod.start) < 0 && currentPeriod.period != END_MARKER) {
+        mode = MODE_LESSON;
+        showCountdown(timeRemaining(d, currentPeriod.end));
     } else {
+        mode = MODE_CLOCK;
         showTime(d);
     }
     // optional - this keeps the watch LCD lit up
@@ -37,25 +78,21 @@ function showDateBar(theDay) {
     g.drawString(getDateText(theDay), 20, 2);
 }
 
-// show the hours, minutes and seconds until the next timetabled event
-function showCountdown(currentTime, endTime) {
-    //console.log("current = " + currentTime + ", end= " + endTime);
+// time, in seconds, until the current period ends
+function timeRemaining(currentTime, endTime) {
+    seconds1 = currentTimeInSeconds(currentTime);
+    seconds2 = secondsSinceMidnight(endTime);
+    return seconds2-seconds1;
+}
+
+// show the time left, as minutes and seconds
+function showCountdown(timeLeft) {
     g.setFontAlign(0,0);  // centre
     g.setFont("Vector", 50);
     g.setColor("#FFFF00");
     // draw the current counter value
-    seconds1 = currentTimeInSeconds(currentTime);
-    seconds2 = secondsSinceMidnight(endTime);
-    //console.log("from " + currentTime.getHours()+ ":" + currentTime.getMinutes() + " to " + endTime + " is "+ (seconds1 - seconds2)/60);
-    let timeLeft = seconds2-seconds1;
-    let mins = Math.floor(timeLeft / 60).toString();
-    if (mins<10) {
-        mins = "0" + mins;  //padding with leading zero
-    }
-    let secs = (timeLeft % 60).toString();
-    if (secs<10) {
-        secs = "0" + secs;  // padding with leading zero
-    }
+    let mins = padTwoDigits(Math.floor(timeLeft / 60));
+    let secs = padTwoDigits(timeLeft % 60);
     g.drawString(mins + ":" + secs, g.getWidth()/2, 100);
 }
 
@@ -76,7 +113,15 @@ function showTime(currentTime) {
     g.setFontAlign(0,0);  // centre
     g.drawString(separator, hPos, vPos);
     g.setFontAlign(-1,0);  // left
-    g.drawString(currentTime.getMinutes(), hPos+5, vPos);
+    g.drawString(padTwoDigits(currentTime.getMinutes()), hPos+5, vPos);
+}
+
+// returns a string with a leading zero or not, as required
+function padTwoDigits(num) {
+    if (num<10) {
+        return "0" + num.toString();  //padding with leading zero
+    }
+    return num.toString();
 }
 
 // shows the text, scaled to fit on the line
@@ -103,7 +148,7 @@ function getDateText(date) {
 }
 
 function getWeekLetter(date) {
-    return "B";
+    return "A";
     // TODO: actually calculate the correct week A or B
 }
 
@@ -162,15 +207,16 @@ function getPeriod(time) {
 
         if (p<0) {
             period = todaysPeriods[0];  //if the time is before the start of the timetable, count down to the start
-            period.next = todaysPeriods[0];
+            period.next = todaysPeriods[1];
         } else if (p<todaysPeriods.length-1) {
             period.next = todaysPeriods[p+1];
         } else {
             period.next = undefined;
         }
-        
+
+        /*
         // DEBUG CODE TO CHECK THE CURRENT PERIOD
-                                            /*
+
         if (p == undefined) {
             console.log("outside timetable");
         } else {
@@ -182,6 +228,7 @@ function getPeriod(time) {
 
             console.log("time left is:" + (timeLeft/60).toString());
         }
+        // END DEBUG CODE
         */
     }
     return period;
@@ -209,7 +256,8 @@ function getNextPeriod(time) {
 // and calculate the end-time for each period
 function loadTimeTable() {
     weeks = ["weekA", "weekB"];
-    timetable = require("Storage").readJSON("timetable.json", true);
+    // load timetable from separate file - TEST currently disabled
+    //timetable = require("Storage").readJSON("timetable.json", true);
     for (d=0; d<7; d++) {
         day = getDayName(d);
         for (w=0; w<weeks.length; w++) {
@@ -225,16 +273,60 @@ function loadTimeTable() {
     return timetable;
 }
 
+// EXPERIMENTAL INPUT STUFF
+function clockInput(data) {
+    if (data.dir = "front") {
+        console.log("front tap");
+    }
+//    console.log(data.dir);
+//    if (data.double) {
+//        clearInterval(interval);
+//        g.clear();
+//        Bangle.on('tap', menuInput);
+
+}
+
+function swipeInput(directionLR, directionUD) {
+    if (mode != MODE_DAY_VIEW) {
+        mode = MODE_DAY_VIEW;
+        vScroll = 0;
+        clearInterval(interval);
+        interval = setInterval(dayView, 100);  // faster update for better scroll performance
+    } else {
+        if (directionUD == -1) {
+            console.log("swipe up");
+            vScroll += 1;
+        }
+        if (directionUD == 1) {
+            console.log("swipe down");
+            vScroll -= 1;
+            if (vScroll <0) {
+             vScroll = 0;                                                                                                   }
+        }
+    }
+}
+
+function touchInput(button, xy) {
+    console.log(button);
+}
+
 // MAIN PROGRAM
 var period = undefined;
 var countdown = 0;
 var today = new Date();
+const START_MARKER = ">>>";
+const END_MARKER   = "<<<";
+const MODE_CLOCK = 0;
+const MODE_LESSON = 1;
+const MODE_DAY_VIEW = 2;
+const MODE_SYNC = 3;
+var mode = MODE_LESSON;
+var vScroll = 0;
 
-// uncomment these lines to write new data to the JSON file
-/*
 var timetable = {
 weekA: {
     mon: [
+        {period:">>>",        start:"8:15"},
         {period:"reg",        start:"8:30"},
         {period:"p1 8w1",     start:"8:35"},
         {period:"p2 free",    start:"9:25"},
@@ -246,9 +338,10 @@ weekA: {
         {period:"p6 free",    start:"13:25"},
         {period:"p7 7xy1",    start:"14:15"},
         {period:"789 end",    start:"15:00"},
-        {period:"all end",    start:"15:10"},
+        {period:"<<<",        start:"15:10"},
         ],
     tue: [
+        {period:">>>",        start:"8:15"},
         {period:"reg",        start:"8:30"},
         {period:"p1 10C",     start:"8:35"},
         {period:"p2 12B",     start:"9:25"},
@@ -260,9 +353,10 @@ weekA: {
         {period:"p6 free",    start:"13:25"},
         {period:"p7 8yz1",    start:"14:15"},
         {period:"789 end",    start:"15:00"},
-        {period:"all end",    start:"15:10"},
+        {period:"<<<",        start:"15:10"},
         ],
     wed: [
+        {period:">>>",        start:"8:15"},
         {period:"reg",        start:"8:30"},
         {period:"p1 free",    start:"8:35"},
         {period:"p2 7z1",     start:"9:25"},
@@ -274,9 +368,10 @@ weekA: {
         {period:"p6 9F",      start:"13:25"},
         {period:"p7 free",    start:"14:15"},
         {period:"789 end",    start:"15:00"},
-        {period:"all end",    start:"15:10"},
+        {period:"<<<",        start:"15:10"},
         ],
     thu: [
+        {period:">>>",        start:"8:15"},
         {period:"reg",        start:"8:30"},
         {period:"p1 free",    start:"8:35"},
         {period:"p2 10C",     start:"9:25"},
@@ -288,9 +383,10 @@ weekA: {
         {period:"p6 7xy2",    start:"13:25"},
         {period:"p7 9D",      start:"14:15"},
         {period:"789 end",    start:"15:00"},
-        {period:"all end",    start:"15:10"},
+        {period:"<<<",        start:"15:10"},
         ],
     fri: [
+        {period:">>>",        start:"8:15"},
         {period:"reg",        start:"8:30"},
         {period:"p1 7w1",     start:"8:35"},
         {period:"p2 free",    start:"9:25"},
@@ -302,9 +398,16 @@ weekA: {
         {period:"p6 10C",     start:"13:25"},
         {period:"p7 DM?",     start:"14:15"},
         {period:"789 end",    start:"15:00"},
-        {period:"all end",    start:"15:10"},
+        {period:"<<<",        start:"15:10"},
+        ],
+    sat: [
+        {period:">>>",        start:"15:05"},
+        {period:"first",      start:"15:07"},
+        {period:"middle",     start:"15:08"},
+        {period:"<<<",        start:"15:09"},
         ],
     sun: [
+        {period:">>>",        start:"8:15"},
         {period:"teg",        start:"8:30"},
         {period:"t1 8w1",     start:"8:35"},
         {period:"t2 free",    start:"9:25"},
@@ -316,12 +419,13 @@ weekA: {
         {period:"t6 free",    start:"13:25"},
         {period:"t7 7xy1",    start:"14:15"},
         {period:"t89 end",    start:"15:00"},
-        {period:"tll end",    start:"15:10"},
+        {period:"<<<",        start:"15:10"},
         ],
         },
 weekB: {
     tue: [
         {period:"reg",        start:"8:30"},
+        {period:">>>",        start:"8:15"},
         {period:"p1 10C",     start:"8:35"},
         {period:"p2 12B",     start:"9:25"},
         {period:"break",      start:"10:15"},
@@ -332,9 +436,10 @@ weekB: {
         {period:"p6 9E",      start:"13:25"},
         {period:"p7 8yz1",    start:"14:15"},
         {period:"789 end",    start:"15:00"},
-        {period:"all end",    start:"15:10"},
+        {period:"<<<",        start:"15:10"},
         ],
     wed: [
+        {period:">>>",        start:"8:15"},
         {period:"reg",        start:"8:30"},
         {period:"p1 free",    start:"8:35"},
         {period:"p2 7z1",     start:"9:25"},
@@ -346,9 +451,10 @@ weekB: {
         {period:"p6 9F",      start:"13:25"},
         {period:"p7 free",    start:"14:15"},
         {period:"789 end",    start:"15:00"},
-        {period:"all end",    start:"15:10"},
+        {period:"<<<",        start:"15:10"},
         ],
     thu: [
+        {period:">>>",        start:"8:15"},
         {period:"reg",        start:"8:30"},
         {period:"p1 free",    start:"8:35"},
         {period:"p2 10C",     start:"9:25"},
@@ -360,14 +466,17 @@ weekB: {
         {period:"p6 7xy2",    start:"13:25"},
         {period:"p7 9D",      start:"14:15"},
         {period:"789 end",    start:"15:00"},
-        {period:"all end",    start:"15:10"},
+        {period:"<<<",        start:"15:10"},
         ],
         },
 };
 
+// uncomment these lines to write new data to the JSON file
+/*
 require("Storage").writeJSON("timetable.json", timetable);
 
 */
+
 /*
 var termDates = {
 TODO - think of a neat way to represent the entire school year
@@ -377,32 +486,35 @@ is it a school day
 bank holidays & inset
 */
 
-
+// initialise the timetable data
+// this includes calculating the end times of all periods
 var timetable = loadTimeTable();
-//console.log(timetable);
 
-//console.log(getPeriod(today));
+// TEST setup the onscreen buttons
+/*
+var Layout = require("Layout");
+var layout = new Layout( {
+   type:"v", c: [
+    {type:"txt", font:"6x8:4", label:"Menu", id:"label"},
+    {type:"btn", font:"6x8:2", label:"Sync", cb: l=>setLabel("One") },
+    {type:"btn", font:"6x8:2", label:"Cancel", cb: l=>setLabel("Two") }
+  ]
+}, {btns:[
+  {label:"Three", cb: l=>setLabel("Three")}
+], lazy:true});
 
-//timeRemaining();
-var interval = setInterval(timeRemaining, 1000);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+function setLabel(x) {
+  layout.label.label = x;
+  layout.render();
+}
+g.clear();
+layout.render();
+*/
 
 
-
+// set callback functions for the display update and touch detection
+var interval = setInterval(countDownView, 1000);
+Bangle.on('swipe', swipeInput);
+Bangle.on('touch', touchInput);
+console.log("setup complete");
 
